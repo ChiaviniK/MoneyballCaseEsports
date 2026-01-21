@@ -1,230 +1,136 @@
 import streamlit as st
 import pandas as pd
-import json
-import time
-import joblib
+import requests
+import plotly.express as px
 
-# --- Configuração da Página ---
-st.set_page_config(
-    page_title="NEXUS ANALYTICS",
-    page_icon="👾",
-    layout="wide"
-)
+# --- Configuração ---
+st.set_page_config(page_title="Fut.Analytica ⚽", layout="wide")
 
-# --- CSS CUSTOMIZADO: PIXEL ART + CYBERPUNK MINIMALISTA ---
+# --- CSS Simples ---
 st.markdown("""
 <style>
-    /* Importando Fontes: Pixelada para Títulos, Mono para Dados */
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@300;400;700&display=swap');
-
-    /* --- Fundo e Cores Globais --- */
-    .stApp {
-        background-color: #0f0518; /* Roxo Quase Preto */
-        color: #e0e0e0;
-        font-family: 'Roboto Mono', monospace; /* Fonte estilo Terminal */
-    }
-
-    /* --- Tipografia Pixelada (Títulos) --- */
-    h1, h2, h3 {
-        font-family: 'Press Start 2P', cursive;
-        text-transform: uppercase;
-        line-height: 1.5;
-    }
-    
-    /* Gradiente no Título Principal */
-    h1 {
-        background: -webkit-linear-gradient(45deg, #ff0055, #9900ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.1);
-    }
-
-    /* --- Cards e Containers Minimalistas --- */
-    div[data-testid="stMetric"], .stCode {
-        background-color: #190b2f; /* Roxo Escuro */
-        border: 1px solid #3d1e6d;
-        border-radius: 4px; /* Cantos levemente arredondados, mas firmes */
-        padding: 15px;
-        box-shadow: 0 4px 0px #240e45; /* Sombra Sólida estilo Pixel */
-    }
-
-    /* --- Botões Arcade --- */
-    .stButton>button {
-        background-color: #ff0055; /* Vermelho Neon */
-        color: white;
-        font-family: 'Press Start 2P', cursive;
-        font-size: 10px;
-        border: none;
-        border-radius: 0px;
-        padding: 15px 30px;
-        box-shadow: 4px 4px 0px #990044;
-        transition: all 0.1s;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        background-color: #ff3377;
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #990044;
-    }
-
-    /* --- Inputs Estilo Console --- */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div {
-        background-color: #0f0518;
-        color: #00ffcc; /* Cyan para texto digitado */
-        border: 1px solid #5a2d91;
-        font-family: 'Roboto Mono', monospace;
-    }
-
-    /* --- Banner Header Customizado --- */
-    .header-banner {
-        width: 100%;
-        height: 150px;
-        background-image: url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop'); 
-        background-size: cover;
-        background-position: center;
-        border-bottom: 4px solid #ff0055;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0.8;
-    }
-    .header-overlay {
-        background: rgba(15, 5, 24, 0.7);
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    /* --- Ajuste de Métricas --- */
-    div[data-testid="stMetricLabel"] { color: #bca0dc; font-size: 0.8rem; }
-    div[data-testid="stMetricValue"] { color: #fff; font-family: 'Press Start 2P'; font-size: 1.2rem !important; }
+    .stApp { background-color: #f0f2f6; }
+    h1 { color: #2e7d32; }
+    div[data-testid="stMetric"] { background-color: white; border-radius: 10px; padding: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- BANNER TOPO (HTML Puro) ---
-st.markdown("""
-<div class="header-banner">
-    <div class="header-overlay">
-        <h2 style="color: white; text-align: center; font-size: 25px;">INSERT COIN TO START</h2>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- HEADER E SIDEBAR ---
-col_logo, col_title = st.columns([1, 5])
-with col_title:
-    st.title("NEXUS ANALYTICS")
-    st.caption("AI-POWERED ESPORTS SCOUTING PLATFORM // VER. 3.0")
-
-with st.sidebar:
-    st.markdown("### SYSTEM STATUS")
-    st.info("🟢 API GATEWAY: ONLINE")
-    st.info("🟢 ML ENGINE: READY")
-    st.markdown("---")
-    st.write("**PRO MODE**")
-    st.caption("Use este painel para monitorar partidas em tempo real e executar predições de vitória.")
-
-st.markdown("---")
-
-# --- SEÇÃO 1: API INGESTION ---
-st.markdown("### 1. LIVE DATA INGESTION")
-with st.container():
-    c1, c2, c3 = st.columns([2, 1, 1])
-    with c1:
-        api_key = st.text_input("RIOT API KEY", type="password", placeholder="RGAPI-XXXXXXXX")
-    with c2:
-        server = st.selectbox("REGION", ["BR1", "NA1", "KR", "EUW"])
-    with c3:
-        st.write("") # Espaço
-        st.write("")
-        btn_search = st.button("SEARCH MATCH")
-
-    if btn_search:
-        with st.spinner("ACCESSING RIOT SERVERS..."):
-            time.sleep(1.5) # Simulação
-            st.success("MATCH DATA RETRIEVED")
-            
-            # Layout de Métricas "Arcade"
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("GAME MODE", "RANKED")
-            m2.metric("ELAPSED TIME", "18:42")
-            m3.metric("GOLD DIFF", "+2.4k")
-            m4.metric("DRAGONS", "2 / 0")
-            
-            # JSON visual
-            st.markdown("**> RAW PAYLOAD**")
-            st.code("""
-{
-  "gameId": 482910,
-  "platformId": "BR1",
-  "status": "IN_PROGRESS",
-  "teams": [
-    {"teamId": 100, "bans": ["Zed", "Lee Sin"], "gold": 24500},
-    {"teamId": 200, "bans": ["Yasuo", "Yone"], "gold": 22100}
-  ]
-}
-            """, language="json")
-
-st.markdown("---")
-
-# --- SEÇÃO 2: ML PREDICTION ---
-st.markdown("### 2. WIN PROBABILITY (AI)")
-st.caption("Carregue o JSON da partida para processar no modelo 'LogReg_v1'.")
-
-col_upl, col_res = st.columns(2)
-
-with col_upl:
-    uploaded_file = st.file_uploader("UPLOAD MATCH JSON", type=["json"])
+# --- FUNÇÃO QUE PEGA DADOS REAIS ---
+@st.cache_data
+def get_brasileirao_data(api_key):
+    """
+    Busca a tabela do Brasileirão Série A (BSA).
+    Documentação: https://www.football-data.org/documentation/quickstart
+    """
+    url = "https://api.football-data.org/v4/competitions/BSA/standings"
+    headers = {'X-Auth-Token': api_key}
     
-    if st.button("LOAD DEMO DATA (SIMULATION)"):
-        st.session_state['match_data'] = {
-            "gold_diff_15min": 3500,
-            "blue_dragons": 3,
-            "red_dragons": 0,
-            "vision_score_diff": 25
-        }
-        st.info("DEMO DATA LOADED INTO MEMORY")
-
-with col_res:
-    # Tenta carregar o modelo
     try:
-        model = joblib.load('lol_win_predictor.pkl')
-        model_status = "ONLINE"
-    except:
-        model_status = "OFFLINE (MODEL NOT FOUND)"
-        model = None
-
-    # Visual do Status do Modelo
-    st.markdown(f"""
-    <div style="border: 1px solid #5a2d91; padding: 10px; background: #0f0518;">
-        <span style="color: #bca0dc; font-size: 0.8rem;">MODEL ENGINE STATUS:</span><br>
-        <span style="color: {'#00ffcc' if model else '#ff0055'}; font-family: 'Press Start 2P'; font-size: 0.9rem;">{model_status}</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Executa a Predição
-    if 'match_data' in st.session_state and model:
-        st.markdown("<br>", unsafe_allow_html=True)
-        data = st.session_state['match_data']
-        
-        # Previsão
-        df_input = pd.DataFrame([data])
-        proba = model.predict_proba(df_input)[0][1] # Probabilidade Blue Win
-        
-        # Visualização do Resultado
-        st.markdown("#### > PREDICTION RESULT")
-        if proba > 0.5:
-            st.success(f"BLUE TEAM VICTORY: {proba:.1%}")
-            st.progress(proba)
-        else:
-            st.error(f"BLUE TEAM DEFEAT: {proba:.1%}")
-            st.progress(proba)
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            # O JSON é complexo: standings -> lista -> table
+            tabela = data['standings'][0]['table']
             
-        st.caption(f"INPUTS: Gold Diff: {data['gold_diff_15min']} | Dragons: {data['blue_dragons']}")
+            # Engenharia de Dados (ETL Simples)
+            # Transformando lista de dicionários em colunas limpas
+            dados_limpos = []
+            for time in tabela:
+                dados_limpos.append({
+                    'Posição': time['position'],
+                    'Time': time['team']['name'],
+                    'Pontos': time['points'],
+                    'Jogos': time['playedGames'],
+                    'Vitórias': time['won'],
+                    'Empates': time['draw'],
+                    'Derrotas': time['lost'],
+                    'Gols Pró': time['goalsFor'],
+                    'Gols Contra': time['goalsAgainst'],
+                    'Saldo Gols': time['goalDifference'],
+                    'Escudo': time['team']['crest']
+                })
+            return pd.DataFrame(dados_limpos)
+        else:
+            return pd.DataFrame()
+    except:
+        return pd.DataFrame()
 
-# --- FOOTER ---
+# --- DADOS DE EXEMPLO (Caso o aluno não tenha API Key) ---
+def get_demo_data():
+    return pd.DataFrame({
+        'Posição': [1, 2, 3, 4, 5],
+        'Time': ['Botafogo', 'Palmeiras', 'Flamengo', 'Fortaleza', 'Internacional'],
+        'Pontos': [68, 64, 60, 58, 55],
+        'Gols Pró': [55, 50, 48, 40, 42],
+        'Gols Contra': [20, 25, 30, 28, 22],
+        'Saldo Gols': [35, 25, 18, 12, 20]
+    })
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/football.png", width=80)
+    st.title("Fut.Analytica")
+    st.markdown("---")
+    
+    # Input da API Key (Segurança básica)
+    api_key = st.text_input("Cole sua API Key aqui:", type="password")
+    st.caption("Sem chave? Usaremos dados de exemplo.")
+    
+    st.markdown("---")
+    st.write("Fonte: football-data.org")
+
+# --- LÓGICA PRINCIPAL ---
+st.title("RAIO-X DO BRASILEIRÃO 🇧🇷")
+
+if api_key:
+    df = get_brasileirao_data(api_key)
+    if df.empty:
+        st.warning("Chave inválida ou erro na API. Carregando demo...")
+        df = get_demo_data()
+    else:
+        st.toast("Dados atualizados da API!", icon="⚽")
+else:
+    df = get_demo_data()
+
+# --- DASHBOARD ---
+
+# 1. KPIs do Líder
+lider = df.iloc[0]
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Líder do Campeonato", lider['Time'])
+c2.metric("Pontuação", lider['Pontos'])
+c3.metric("Melhor Ataque (Gols)", df['Gols Pró'].max())
+c4.metric("Melhor Defesa (Gols)", df['Gols Contra'].min())
+
 st.markdown("---")
-st.markdown("<center style='font-family: Roboto Mono; color: #666; font-size: 12px;'>POWERED BY RIOT GAMES DATA • DEVELOPED FOR ACADEMIC PURPOSES</center>", unsafe_allow_html=True)
+
+# 2. GRÁFICO DE DISPERSÃO (ATAQUE vs DEFESA)
+st.subheader("📊 Eficiência: Ataque vs Defesa")
+st.caption("Times no canto SUPERIOR DIREITO fazem muitos gols mas sofrem muitos. Times no canto INFERIOR DIREITO são equilibrados.")
+
+fig = px.scatter(
+    df, 
+    x="Gols Pró", 
+    y="Gols Contra", 
+    text="Time", 
+    size="Pontos", 
+    color="Saldo Gols",
+    color_continuous_scale="RdYlGn", # Vermelho (Ruim) -> Verde (Bom)
+    title="Mapa de Desempenho dos Clubes"
+)
+fig.update_traces(textposition='top center')
+st.plotly_chart(fig, use_container_width=True)
+
+# 3. TABELA DETALHADA
+st.subheader("📋 Classificação Oficial")
+
+# Formatação visual da tabela (Pandas Styler)
+st.dataframe(
+    df[['Posição', 'Time', 'Pontos', 'Jogos', 'Vitórias', 'Saldo Gols']],
+    hide_index=True,
+    use_container_width=True
+)
+
+# 4. DOWNLOAD
+csv = df.to_csv(index=False).encode('utf-8')
+st.download_button("📥 Baixar Tabela (CSV)", csv, "brasileirao.csv", "text/csv")
