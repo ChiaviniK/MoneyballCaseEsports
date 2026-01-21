@@ -4,36 +4,56 @@ import requests
 import plotly.express as px
 
 # --- Configuração ---
-st.set_page_config(page_title="Fut.Analytica ⚽", layout="wide")
+st.set_page_config(page_title="Fut.Analytica Pro", page_icon="⚽", layout="wide")
 
-# --- CSS Simples ---
+# --- CSS Personalizado ---
 st.markdown("""
 <style>
-    .stApp { background-color: #f0f2f6; }
-    h1 { color: #2e7d32; }
-    div[data-testid="stMetric"] { background-color: white; border-radius: 10px; padding: 10px; }
+    .stApp { background-color: #f8f9fa; }
+    h1 { color: #1e3a8a; } /* Azul Profissional */
+    div[data-testid="stMetric"] {
+        background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO QUE PEGA DADOS REAIS ---
+# --- MAPA DE LIGAS (O Dicionário do Aluno) ---
+# O aluno aprende que o usuário vê "Nome", mas o sistema usa "Código"
+LIGAS = {
+    "Brasileirão Série A": "BSA",
+    "Premier League (Inglaterra)": "PL",
+    "Champions League (Europa)": "CL",
+    "La Liga (Espanha)": "PD",
+    "Serie A (Itália)": "SA",
+    "Bundesliga (Alemanha)": "BL1",
+    "Ligue 1 (França)": "FL1"
+}
+
+# --- FUNÇÃO DE DADOS (Com Parâmetros Dinâmicos) ---
 @st.cache_data
-def get_brasileirao_data(api_key):
+def get_football_data(api_key, league_code, season_year):
     """
-    Busca a tabela do Brasileirão Série A (BSA).
-    Documentação: https://www.football-data.org/documentation/quickstart
+    Busca dados dinâmicos baseados na escolha do usuário.
+    URL muda conforme a liga e o ano.
     """
-    url = "https://api.football-data.org/v4/competitions/BSA/standings"
+    # Construção da URL Dinâmica (f-string)
+    url = f"https://api.football-data.org/v4/competitions/{league_code}/standings?season={season_year}"
     headers = {'X-Auth-Token': api_key}
     
     try:
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             data = response.json()
-            # O JSON é complexo: standings -> lista -> table
+            
+            # Tratamento especial para Champions League (que tem grupos)
+            # Para simplificar para Junior, pegamos apenas a tabela TOTAL se disponível
+            # ou o primeiro grupo disponível
+            if 'standings' not in data or len(data['standings']) == 0:
+                return pd.DataFrame()
+
+            # Pega a primeira tabela disponível (Geral ou Grupo A)
             tabela = data['standings'][0]['table']
             
-            # Engenharia de Dados (ETL Simples)
-            # Transformando lista de dicionários em colunas limpas
             dados_limpos = []
             for time in tabela:
                 dados_limpos.append({
@@ -42,12 +62,11 @@ def get_brasileirao_data(api_key):
                     'Pontos': time['points'],
                     'Jogos': time['playedGames'],
                     'Vitórias': time['won'],
-                    'Empates': time['draw'],
                     'Derrotas': time['lost'],
+                    'Empates': time['draw'],
                     'Gols Pró': time['goalsFor'],
                     'Gols Contra': time['goalsAgainst'],
-                    'Saldo Gols': time['goalDifference'],
-                    'Escudo': time['team']['crest']
+                    'Saldo Gols': time['goalDifference']
                 })
             return pd.DataFrame(dados_limpos)
         else:
@@ -55,82 +74,103 @@ def get_brasileirao_data(api_key):
     except:
         return pd.DataFrame()
 
-# --- DADOS DE EXEMPLO (Caso o aluno não tenha API Key) ---
+# --- DADOS DEMO (Fallback) ---
 def get_demo_data():
     return pd.DataFrame({
         'Posição': [1, 2, 3, 4, 5],
-        'Time': ['Botafogo', 'Palmeiras', 'Flamengo', 'Fortaleza', 'Internacional'],
-        'Pontos': [68, 64, 60, 58, 55],
-        'Gols Pró': [55, 50, 48, 40, 42],
-        'Gols Contra': [20, 25, 30, 28, 22],
-        'Saldo Gols': [35, 25, 18, 12, 20]
+        'Time': ['Manchester City (Demo)', 'Arsenal', 'Liverpool', 'Aston Villa', 'Tottenham'],
+        'Pontos': [88, 86, 80, 75, 70],
+        'Gols Pró': [90, 85, 80, 70, 65],
+        'Gols Contra': [30, 28, 35, 40, 45],
+        'Saldo Gols': [60, 57, 45, 30, 20]
     })
 
-# --- SIDEBAR ---
+# --- SIDEBAR (CONTROLES) ---
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/football.png", width=80)
+    st.image("https://img.icons8.com/fluency/96/soccer-ball.png", width=70)
     st.title("Fut.Analytica")
+    st.caption("Agência de Scouting Esportivo")
     st.markdown("---")
     
-    # Input da API Key (Segurança básica)
-    api_key = st.text_input("Cole sua API Key aqui:", type="password")
-    st.caption("Sem chave? Usaremos dados de exemplo.")
+    # 1. Input da Chave
+    api_key = st.text_input("🔑 Sua API Key:", type="password")
     
     st.markdown("---")
-    st.write("Fonte: football-data.org")
+    
+    # 2. Seleção de Campeonato (Chave do Dicionário)
+    nome_liga = st.selectbox("🏆 Campeonato:", list(LIGAS.keys()))
+    codigo_liga = LIGAS[nome_liga] # Pega o código (ex: 'PL')
+    
+    # 3. Seleção de Temporada
+    # A API gratuita tem limites históricos, então focamos em anos recentes
+    ano = st.selectbox("📅 Temporada:", [2024, 2023, 2022])
+    
+    st.info(f"Buscando: {codigo_liga} / {ano}")
 
 # --- LÓGICA PRINCIPAL ---
-st.title("RAIO-X DO BRASILEIRÃO 🇧🇷")
+st.title(f"ANÁLISE: {nome_liga.upper()}")
 
+# Carrega Dados
 if api_key:
-    df = get_brasileirao_data(api_key)
+    with st.spinner("Consultando dados oficiais..."):
+        df = get_football_data(api_key, codigo_liga, ano)
+        
     if df.empty:
-        st.warning("Chave inválida ou erro na API. Carregando demo...")
+        st.warning(f"Não foram encontrados dados para {ano} ou a API Key atingiu o limite.")
+        st.info("Carregando modo de demonstração...")
         df = get_demo_data()
     else:
-        st.toast("Dados atualizados da API!", icon="⚽")
+        st.toast("Dados carregados com sucesso!", icon="✅")
 else:
+    st.info("Insira a API Key para ver dados reais. Mostrando demonstração.")
     df = get_demo_data()
 
-# --- DASHBOARD ---
+# --- DASHBOARD JUNIOR ---
 
-# 1. KPIs do Líder
-lider = df.iloc[0]
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Líder do Campeonato", lider['Time'])
-c2.metric("Pontuação", lider['Pontos'])
-c3.metric("Melhor Ataque (Gols)", df['Gols Pró'].max())
-c4.metric("Melhor Defesa (Gols)", df['Gols Contra'].min())
+if not df.empty:
+    # 1. TOP 3 (PODIUM)
+    col1, col2, col3 = st.columns(3)
+    
+    try:
+        campeao = df.iloc[0]
+        vice = df.iloc[1]
+        terceiro = df.iloc[2]
+        
+        col1.metric("🥇 Campeão/Líder", campeao['Time'], f"{campeao['Pontos']} pts")
+        col2.metric("🥈 Vice-Líder", vice['Time'], f"{vice['Pontos']} pts")
+        col3.metric("🥉 3º Lugar", terceiro['Time'], f"{terceiro['Pontos']} pts")
+    except:
+        st.write("Dados insuficientes para pódio.")
 
-st.markdown("---")
+    st.markdown("---")
 
-# 2. GRÁFICO DE DISPERSÃO (ATAQUE vs DEFESA)
-st.subheader("📊 Eficiência: Ataque vs Defesa")
-st.caption("Times no canto SUPERIOR DIREITO fazem muitos gols mas sofrem muitos. Times no canto INFERIOR DIREITO são equilibrados.")
+    # 2. GRÁFICO (SCATTER PLOT)
+    st.subheader("🎯 Eficiência Ofensiva x Defensiva")
+    
+    tab1, tab2 = st.tabs(["Gráfico de Dispersão", "Tabela Completa"])
+    
+    with tab1:
+        # Gráfico colorido e interativo
+        fig = px.scatter(
+            df,
+            x="Gols Pró",
+            y="Gols Contra",
+            text="Time",
+            size="Pontos",
+            color="Posição",
+            color_continuous_scale="bluered", # Azul (Topo) -> Vermelho (Baixo)
+            title=f"Performance dos Clubes: {ano}"
+        )
+        # Inverte o eixo Y (porque levar MENOS gols é melhor, então deve ficar no topo visualmente ou explicamos o gráfico)
+        # Vamos manter padrão: Quanto mais pra direita (mais gols) e mais pra baixo (menos gols sofridos), melhor.
+        fig.update_traces(textposition='top center')
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Dica de Análise: Os melhores times ficam no canto **Inferior Direito** (Muitos Gols Feitos, Poucos Sofridos).")
 
-fig = px.scatter(
-    df, 
-    x="Gols Pró", 
-    y="Gols Contra", 
-    text="Time", 
-    size="Pontos", 
-    color="Saldo Gols",
-    color_continuous_scale="RdYlGn", # Vermelho (Ruim) -> Verde (Bom)
-    title="Mapa de Desempenho dos Clubes"
-)
-fig.update_traces(textposition='top center')
-st.plotly_chart(fig, use_container_width=True)
+    with tab2:
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
-# 3. TABELA DETALHADA
-st.subheader("📋 Classificação Oficial")
-
-# Formatação visual da tabela (Pandas Styler)
-st.dataframe(
-    df[['Posição', 'Time', 'Pontos', 'Jogos', 'Vitórias', 'Saldo Gols']],
-    hide_index=True,
-    use_container_width=True
-)
-
-# 4. DOWNLOAD
-csv = df.to_csv(index=False).encode('utf-8')
-st.download_button("📥 Baixar Tabela (CSV)", csv, "brasileirao.csv", "text/csv")
+    # 3. EXPORTAÇÃO
+    st.markdown("---")
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Baixar Relatório (Excel/CSV)", csv, f"dados_{codigo_liga}_{ano}.csv", "text/csv")
